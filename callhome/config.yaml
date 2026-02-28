@@ -1,0 +1,21 @@
+name: "SSH Call Home"
+description: "Reverse SSH tunnel naar externe server"
+version: "1.0.6"
+slug: "ssh_call_home"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+options:
+  ssh_host: ""
+  ssh_port: 
+  ssh_user: ""
+  remote_port: 
+  private_key: ""
+schema:
+  ssh_host: str
+  ssh_port: int
+  ssh_user: str
+  remote_port: int
+  private_key: password
