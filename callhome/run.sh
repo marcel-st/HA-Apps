@@ -70,7 +70,7 @@ prepare_ssh_key() {
     mkdir -p "${SSH_DIR}"
     chmod 700 "${SSH_DIR}"
 
-    log_info "SSH private key ophalen en herstellen."
+    log_info "Retrieving and restoring SSH private key."
 
     raw_key=$(jq -r '.private_key' /data/options.json)
     clean_base64=$(printf '%s' "${raw_key}" | sed 's/-----BEGIN [A-Z ]*-----//g' | sed 's/-----END [A-Z ]*-----//g' | tr -d '[:space:]')
@@ -84,21 +84,21 @@ prepare_ssh_key() {
     chmod 600 "${SSH_KEY_PATH}"
 
     if ! ssh-keygen -l -f "${SSH_KEY_PATH}" >/dev/null 2>&1; then
-        log_error "De private key blijft ongeldig na reparatiepoging."
+        log_error "Private key remains invalid after repair attempt."
         exit 1
     fi
 
     touch "${KNOWN_HOSTS_PATH}"
     chmod 600 "${KNOWN_HOSTS_PATH}"
 
-    log_info "SSH private key succesvol geladen."
+    log_info "SSH private key loaded successfully."
 }
 
 refresh_known_hosts() {
-    log_info "SSH host key ophalen voor ${SSH_HOST}:${SSH_PORT}."
+    log_info "Fetching SSH host key for ${SSH_HOST}:${SSH_PORT}."
 
     if ! ssh-keyscan -H -p "${SSH_PORT}" "${SSH_HOST}" >> "${KNOWN_HOSTS_PATH}" 2>/dev/null; then
-        log_warn "Kon de host key niet vooraf ophalen. Verbinding gaat verder met StrictHostKeyChecking=no."
+        log_warn "Could not pre-fetch host key. Proceeding with StrictHostKeyChecking=no."
     fi
 }
 
@@ -108,7 +108,7 @@ stop_tunnel() {
     fi
 
     if is_tunnel_running; then
-        log_info "Stoppen van bestaande reverse tunnel met PID ${AUTOSSH_PID}."
+        log_info "Stopping existing reverse tunnel with PID ${AUTOSSH_PID}."
         kill "${AUTOSSH_PID}" 2>/dev/null || true
 
         for ((i = 0; i < 10; i++)); do
@@ -119,7 +119,7 @@ stop_tunnel() {
         done
 
         if is_tunnel_running; then
-            log_warn "Tunnelproces reageerde niet op SIGTERM, forceer stop."
+            log_warn "Tunnel process did not respond to SIGTERM, forcing stop."
             kill -9 "${AUTOSSH_PID}" 2>/dev/null || true
         fi
 
@@ -135,7 +135,7 @@ start_tunnel() {
 
     export AUTOSSH_GATETIME=0
 
-    log_info "Start reverse SSH tunnel naar ${SSH_HOST}:${SSH_PORT} met remote poort ${REMOTE_PORT}."
+    log_info "Starting reverse SSH tunnel to ${SSH_HOST}:${SSH_PORT} with remote port ${REMOTE_PORT}."
 
     autossh -M 0 \
         "${SSH_OPTIONS[@]}" \
@@ -151,28 +151,28 @@ start_tunnel() {
 
     if ! is_tunnel_running; then
         wait "${AUTOSSH_PID}" 2>/dev/null || true
-        log_error "Tunnelproces stopte direct na het starten."
+        log_error "Tunnel process stopped immediately after starting."
         AUTOSSH_PID=""
         return 1
     fi
 
-    log_info "Reverse SSH tunnel gestart met PID ${AUTOSSH_PID}."
+    log_info "Reverse SSH tunnel started with PID ${AUTOSSH_PID}."
     return 0
 }
 
 check_control_connection() {
     if [ ! -S "${CONTROL_SOCKET}" ]; then
-        HEALTH_FAILURE_REASON="control socket ontbreekt"
+        HEALTH_FAILURE_REASON="control socket is missing"
         return 1
     fi
 
     if ! ssh -S "${CONTROL_SOCKET}" -O check -p "${SSH_PORT}" "${SSH_TARGET}" >/dev/null 2>&1; then
-        HEALTH_FAILURE_REASON="SSH control connection is niet actief"
+        HEALTH_FAILURE_REASON="SSH control connection is not active"
         return 1
     fi
 
     if ! run_with_timeout 20 ssh -S "${CONTROL_SOCKET}" -o ControlMaster=no -o ControlPath="${CONTROL_SOCKET}" -o BatchMode=yes -p "${SSH_PORT}" "${SSH_TARGET}" exit >/dev/null 2>&1; then
-        HEALTH_FAILURE_REASON="bestaande SSH verbinding reageert niet meer"
+        HEALTH_FAILURE_REASON="existing SSH connection is no longer responding"
         return 1
     fi
 
@@ -197,12 +197,12 @@ check_remote_listener() {
     fi
 
     if [ "${status}" -eq 3 ]; then
-        log_warn "Remote host ondersteunt geen ss, netstat, lsof of nc. Listener-check wordt uitgeschakeld; SSH health probe blijft actief."
+        log_warn "Remote host does not support ss, netstat, lsof, or nc. Listener check disabled; SSH health probe remains active."
         REMOTE_LISTENER_CHECK_ENABLED=0
         return 0
     fi
 
-    HEALTH_FAILURE_REASON="remote poort ${REMOTE_PORT} luistert niet meer op ${SSH_HOST}"
+    HEALTH_FAILURE_REASON="remote port ${REMOTE_PORT} is no longer listening on ${SSH_HOST}"
     return 1
 }
 
@@ -210,7 +210,7 @@ probe_tunnel_health() {
     HEALTH_FAILURE_REASON=""
 
     if ! is_tunnel_running; then
-        HEALTH_FAILURE_REASON="autossh proces draait niet"
+        HEALTH_FAILURE_REASON="autossh process is not running"
         return 1
     fi
 
@@ -228,7 +228,7 @@ wait_for_healthy_tunnel() {
             return 0
         fi
 
-        log_warn "Tunnel nog niet gezond na start (poging ${attempt}/10): ${HEALTH_FAILURE_REASON}."
+        log_warn "Tunnel not yet healthy after start (attempt ${attempt}/10): ${HEALTH_FAILURE_REASON}."
         sleep 3
     done
 
@@ -238,25 +238,25 @@ wait_for_healthy_tunnel() {
 rebuild_tunnel() {
     local reason="$1"
 
-    log_warn "Reverse SSH tunnel wordt opnieuw opgebouwd: ${reason}."
+    log_warn "Rebuilding reverse SSH tunnel: ${reason}."
     stop_tunnel
 
     if ! start_tunnel; then
-        log_error "Opnieuw opbouwen van de reverse tunnel is mislukt tijdens het starten."
+        log_error "Rebuild of reverse tunnel failed during startup."
         return 1
     fi
 
     if ! wait_for_healthy_tunnel; then
-        log_error "Opnieuw opgebouwde tunnel is niet gezond geworden: ${HEALTH_FAILURE_REASON}."
+        log_error "Rebuilt tunnel did not become healthy: ${HEALTH_FAILURE_REASON}."
         return 1
     fi
 
-    log_info "Reverse SSH tunnel opnieuw opgebouwd en gezond."
+    log_info "Reverse SSH tunnel rebuilt and healthy."
     return 0
 }
 
 shutdown() {
-    log_info "Stop-signaal ontvangen, reverse tunnel wordt afgesloten."
+    log_info "Shutdown signal received, closing reverse tunnel."
     stop_tunnel
     exit 0
 }
@@ -271,18 +271,18 @@ if ! start_tunnel; then
 fi
 
 if ! wait_for_healthy_tunnel; then
-    log_error "Initiële reverse tunnel is niet gezond geworden: ${HEALTH_FAILURE_REASON}."
+    log_error "Initial reverse tunnel did not become healthy: ${HEALTH_FAILURE_REASON}."
     exit 1
 fi
 
-log_info "Health checks actief: elke ${HEALTH_CHECK_INTERVAL}s. Geforceerde rebuild elke 12 uur."
+log_info "Health checks active: every ${HEALTH_CHECK_INTERVAL}s. Forced rebuild every 12 hours."
 
 while true; do
     sleep "${HEALTH_CHECK_INTERVAL}"
 
     if ! probe_tunnel_health; then
-        log_warn "Health check mislukt: ${HEALTH_FAILURE_REASON}."
-        rebuild_tunnel "health check mislukt" || exit 1
+        log_warn "Health check failed: ${HEALTH_FAILURE_REASON}."
+        rebuild_tunnel "health check failed" || exit 1
         HEALTH_CHECK_COUNT=0
         continue
     fi
@@ -290,12 +290,12 @@ while true; do
     HEALTH_CHECK_COUNT=$((HEALTH_CHECK_COUNT + 1))
 
     if [ $((HEALTH_CHECK_COUNT % HEALTH_LOG_INTERVAL)) -eq 0 ]; then
-        log_info "Health check succesvol: reverse SSH tunnel is nog actief."
+        log_info "Health check successful: reverse SSH tunnel is still active."
     fi
 
     if [ $(( $(date +%s) - LAST_REBUILD_TS )) -ge "${REBUILD_INTERVAL}" ]; then
-        log_info "12-uurs onderhoudsrebuild gestart voor de reverse SSH tunnel."
-        rebuild_tunnel "geplande 12-uurs rebuild" || exit 1
+        log_info "12-hour maintenance rebuild started for the reverse SSH tunnel."
+        rebuild_tunnel "scheduled 12-hour rebuild" || exit 1
         HEALTH_CHECK_COUNT=0
     fi
 done
