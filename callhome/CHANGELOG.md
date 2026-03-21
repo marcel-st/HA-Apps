@@ -4,6 +4,12 @@ All notable changes to this add-on are documented in this file.
 
 The format is based on Keep a Changelog and versions follow the add-on version in `config.yaml`.
 
+## [1.2.0] - 2026-03-21
+
+### Changed
+
+- Translated all log messages, errors, and notifications from Dutch to English
+
 ## [1.1.0] - 2026-03-21
 
 ### Added
