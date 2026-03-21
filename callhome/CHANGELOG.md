@@ -4,6 +4,18 @@ All notable changes to this add-on are documented in this file.
 
 The format is based on Keep a Changelog and versions follow the add-on version in `config.yaml`.
 
+## [1.3.0] - 2026-03-21
+
+### Added
+
+- Added an ingress panel page with a button to update the add-on to the latest version
+
+### Changed
+
+- Enabled Supervisor API access required for in-app update action
+- Added optional `update_ui` configuration flag (default `true`)
+- Updated runtime and image to run the update panel service while tunnel is active
+
 ## [1.2.0] - 2026-03-21
 
 ### Changed

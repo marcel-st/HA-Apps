@@ -22,6 +22,7 @@ LAST_REBUILD_TS=0
 HEALTH_CHECK_COUNT=0
 HEALTH_FAILURE_REASON=""
 REMOTE_LISTENER_CHECK_ENABLED=1
+UPDATE_SERVER_PID=""
 
 SSH_OPTIONS=(
     -p "${SSH_PORT}"
@@ -46,6 +47,39 @@ log_warn() {
 
 log_error() {
     bashio::log.error "$*"
+}
+
+start_update_server() {
+    case "${UPDATE_UI_ENABLED}" in
+        true|True|TRUE|1|yes|Yes|on|On)
+            ;;
+        *)
+            log_info "Update UI is disabled."
+            return 0
+            ;;
+    esac
+
+    if [ "${INGRESS_PORT}" = "" ]; then
+        INGRESS_PORT=8099
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_warn "python3 is not available. Update UI will not start."
+        return 0
+    fi
+
+    log_info "Starting update UI on ingress port ${INGRESS_PORT}."
+    INGRESS_PORT="${INGRESS_PORT}" python3 /update_server.py &
+    UPDATE_SERVER_PID=$!
+}
+
+stop_update_server() {
+    if [ -n "${UPDATE_SERVER_PID}" ] && kill -0 "${UPDATE_SERVER_PID}" 2>/dev/null; then
+        kill "${UPDATE_SERVER_PID}" 2>/dev/null || true
+        wait "${UPDATE_SERVER_PID}" 2>/dev/null || true
+    fi
+
+    UPDATE_SERVER_PID=""
 }
 
 run_with_timeout() {
@@ -257,6 +291,7 @@ rebuild_tunnel() {
 
 shutdown() {
     log_info "Shutdown signal received, closing reverse tunnel."
+    stop_update_server
     stop_tunnel
     exit 0
 }
@@ -265,13 +300,18 @@ trap shutdown SIGINT SIGTERM SIGHUP
 
 prepare_ssh_key
 refresh_known_hosts
+UPDATE_UI_ENABLED=$(bashio::config 'update_ui')
+INGRESS_PORT=${INGRESS_PORT:-8099}
+start_update_server
 
 if ! start_tunnel; then
+    stop_update_server
     exit 1
 fi
 
 if ! wait_for_healthy_tunnel; then
     log_error "Initial reverse tunnel did not become healthy: ${HEALTH_FAILURE_REASON}."
+    stop_update_server
     exit 1
 fi
 
@@ -282,7 +322,10 @@ while true; do
 
     if ! probe_tunnel_health; then
         log_warn "Health check failed: ${HEALTH_FAILURE_REASON}."
-        rebuild_tunnel "health check failed" || exit 1
+        rebuild_tunnel "health check failed" || {
+            stop_update_server
+            exit 1
+        }
         HEALTH_CHECK_COUNT=0
         continue
     fi
@@ -295,7 +338,10 @@ while true; do
 
     if [ $(( $(date +%s) - LAST_REBUILD_TS )) -ge "${REBUILD_INTERVAL}" ]; then
         log_info "12-hour maintenance rebuild started for the reverse SSH tunnel."
-        rebuild_tunnel "scheduled 12-hour rebuild" || exit 1
+        rebuild_tunnel "scheduled 12-hour rebuild" || {
+            stop_update_server
+            exit 1
+        }
         HEALTH_CHECK_COUNT=0
     fi
 done

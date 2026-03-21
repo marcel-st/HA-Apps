@@ -10,6 +10,7 @@ The `SSH Call Home` add-on creates and maintains a reverse SSH tunnel from Home 
 - Automatic rebuild when the SSH session or remote listener becomes stale
 - Scheduled maintenance rebuild every 12 hours
 - SSH key based authentication
+- Ingress panel with an update button for latest add-on version
 
 ## Configuration
 
@@ -21,6 +22,7 @@ ssh_port: 22
 ssh_user: "username"
 remote_port: 8123
 private_key: "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"
+update_ui: true
 ```
 
 ### Option reference
@@ -32,6 +34,17 @@ private_key: "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE
 | `ssh_user` | string | Yes | SSH username used for authentication |
 | `remote_port` | integer | Yes | Port opened on the remote server and forwarded to Home Assistant |
 | `private_key` | password | Yes | Full OpenSSH private key used by the add-on |
+| `update_ui` | boolean | No | Enables the in-app ingress panel button to trigger add-on update |
+
+## In-app update button
+
+When the add-on is running, open the add-on panel in Home Assistant and use **Update to latest version** to trigger an update through the Supervisor API.
+
+Notes:
+
+- This action starts the add-on update process and the add-on is restarted by Supervisor.
+- The button updates this add-on only.
+- The add-on requires Supervisor API access (`hassio_api: true`) which is enabled in this release.
 
 ## Remote server setup
 

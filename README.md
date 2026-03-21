@@ -13,7 +13,9 @@ This repository contains custom Home Assistant add-ons maintained by Marcel Stan
 ### SSH Call Home
 Creates a reverse SSH tunnel to an external server, allowing remote access to your Home Assistant instance even when behind NAT or firewall.
 
-**Version:** 1.2.0  
+Includes an in-app update button in the running add-on panel to trigger update to the latest add-on version.
+
+**Version:** 1.3.0  
 **Architectures:** aarch64, amd64, armv7
 
 See [callhome/README.md](callhome/README.md) for detailed documentation.

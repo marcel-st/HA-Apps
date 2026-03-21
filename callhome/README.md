@@ -8,6 +8,7 @@ Creates a reverse SSH tunnel to an external server, enabling remote access to Ho
 - Active health checks every minute
 - Automatic rebuild when the SSH session or remote listener becomes stale
 - Scheduled tunnel rebuild every 12 hours
+- Built-in add-on panel button to update to the latest version
 
 ## Documentation
 
@@ -16,4 +17,4 @@ Creates a reverse SSH tunnel to an external server, enabling remote access to Ho
 
 ## Current release
 
-Version `1.1.0` adds logging, active health verification, automatic reconnection recovery, and scheduled maintenance rebuilds.
+Version `1.3.0` adds an in-app update button in the running add-on panel to trigger update to the latest version from Supervisor.
